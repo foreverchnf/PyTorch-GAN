@@ -3,6 +3,7 @@ import os
 import numpy as np
 import math
 import sys
+import time
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
@@ -16,6 +17,7 @@ import torch.nn.functional as F
 import torch
 
 os.makedirs("images", exist_ok=True)
+os.makedirs("saved_models", exist_ok=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
@@ -28,13 +30,13 @@ parser.add_argument("--channels", type=int, default=1, help="number of image cha
 parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
 parser.add_argument("--clip_value", type=float, default=0.01, help="lower and upper clip value for disc. weights")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval betwen image samples")
+parser.add_argument("--checkpoint_interval", type=int, default=-1, help="interval between saving model checkpoints")
 opt = parser.parse_args()
 print(opt)
 
 img_shape = (opt.channels, opt.img_size, opt.img_size)
 
 cuda = True if torch.cuda.is_available() else False
-
 
 class Generator(nn.Module):
     def __init__(self):
@@ -127,7 +129,7 @@ for epoch in range(opt.n_epochs):
 
         # Sample noise as generator input
         z = Variable(Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim))))
-
+ 
         # Generate a batch of images
         fake_imgs = generator(z).detach()
         # Adversarial loss
@@ -138,7 +140,13 @@ for epoch in range(opt.n_epochs):
 
         # Clip weights of discriminator
         for p in discriminator.parameters():
+            print(p)
             p.data.clamp_(-opt.clip_value, opt.clip_value)
+            
+        for p in discriminator.parameters():
+            print(p)
+        
+        break
 
         # Train the generator every n_critic iterations
         if i % opt.n_critic == 0:
@@ -157,11 +165,17 @@ for epoch in range(opt.n_epochs):
             loss_G.backward()
             optimizer_G.step()
 
-            print(
+            
+        if batches_done % opt.sample_interval == 0:
+            print("[{}]".format(time.strftime('%Y-%m-%d %H:%M:%S')), 
                 "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
                 % (epoch, opt.n_epochs, batches_done % len(dataloader), len(dataloader), loss_D.item(), loss_G.item())
             )
-
-        if batches_done % opt.sample_interval == 0:
-            save_image(gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
+            save_image(gen_imgs.data[:36], "images/%d.png" % batches_done, nrow=6, normalize=True)
         batches_done += 1
+
+    if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0:
+        # Save model checkpoints
+        torch.save(generator.state_dict(), "saved_models/%s/G_AB_%d.pth" % (opt.dataset_name, epoch))
+        torch.save(discriminator.state_dict(), "saved_models/%s/D_A_%d.pth" % (opt.dataset_name, epoch))
+        

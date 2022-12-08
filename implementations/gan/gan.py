@@ -28,6 +28,7 @@ parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality 
 parser.add_argument("--img_size", type=int, default=28, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval betwen image samples")
+parser.add_argument("--checkpoint_interval", type=int, default=-1, help="interval between saving model checkpoints")
 opt = parser.parse_args()
 print(opt)
 
@@ -164,8 +165,12 @@ for epoch in range(opt.n_epochs):
         
         batches_done = epoch * len(dataloader) + i
         if batches_done % opt.sample_interval == 0:
-            save_image(gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
+            save_image(gen_imgs.data[:36], "images/%d.png" % batches_done, nrow=6, normalize=True)
             print("[{}]".format(time.strftime('%Y-%m-%d %H:%M:%S')), 
             "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
             % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item())
         )
+    if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0:
+        # Save model checkpoints
+        torch.save(Generator.state_dict(), "saved_models/%s/G_AB_%d.pth" % (opt.dataset_name, epoch))
+        torch.save(Discriminator.state_dict(), "saved_models/%s/D_A_%d.pth" % (opt.dataset_name, epoch))

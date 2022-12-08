@@ -3,6 +3,7 @@ import os
 import numpy as np
 import math
 import sys
+import time 
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
@@ -17,6 +18,7 @@ import torch.autograd as autograd
 import torch
 
 os.makedirs("images", exist_ok=True)
+os.makedirs("saved_models", exist_ok=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
@@ -31,6 +33,7 @@ parser.add_argument("--channels", type=int, default=1, help="number of image cha
 parser.add_argument("--n_critic", type=int, default=5, help="number of training steps for discriminator per iter")
 parser.add_argument("--clip_value", type=float, default=0.01, help="lower and upper clip value for disc. weights")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval betwen image samples")
+parser.add_argument("--checkpoint_interval", type=int, default=-1, help="interval between saving model checkpoints")
 opt = parser.parse_args()
 print(opt)
 
@@ -192,12 +195,23 @@ for epoch in range(opt.n_epochs):
             g_loss.backward()
             optimizer_G.step()
 
-            print(
-                "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
-                % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item())
-            )
-
-            if batches_done % opt.sample_interval == 0:
-                save_image(fake_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
+            # if batches_done % opt.sample_interval == 0:
+            #     print("[{}]".format(time.strftime('%Y-%m-%d %H:%M:%S')),
+            #         "[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
+            #         % (epoch, opt.n_epochs, i, len(dataloader), d_loss.item(), g_loss.item())
+            #     )
+            #     save_image(fake_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
 
             batches_done += opt.n_critic
+    print("[{}]".format(time.strftime('%Y-%m-%d %H:%M:%S')),
+        "[Epoch %d/%d] [D loss: %f] [G loss: %f]"
+        % (epoch+1, opt.n_epochs, d_loss.item(), g_loss.item())
+    )
+    save_image(fake_imgs.data[:25], "images/epoch_%d.png" % epoch, nrow=5, normalize=True)
+
+    if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0:
+        # Save model checkpoints
+        dataset_name = 'mnist'
+        os.makedirs("saved_models/%s" % dataset_name, exist_ok=True)
+        torch.save(generator.state_dict(), "saved_models/%s/G_%d.pth" % (dataset_name, epoch))
+        torch.save(discriminator.state_dict(), "saved_models/%s/D_%d.pth" % (dataset_name, epoch))
